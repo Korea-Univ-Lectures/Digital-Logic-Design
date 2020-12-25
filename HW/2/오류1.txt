@@ -1,0 +1,50 @@
+module pulGen(in, clk, rst, out);
+	output reg out;
+	input clk, in, rst;
+	reg [1:0] currstate0;
+	reg [1:0] nextstate0;
+
+	parameter out_S0 = 2'b00; parameter out_S1 = 2'b01; parameter out_S2 = 2'b10;
+
+	always @(posedge clk)//State Change
+	begin
+	if(rst)
+		begin
+		currstate0 <= out_S0;
+		end
+	else
+		begin
+		currstate0 <= nextstate0; 
+		end
+	end
+	
+	always @(*)
+	begin
+	if(in)
+		begin
+		
+		case(currstate0)
+		out_S0: nextstate0<=out_S1;
+		out_S1: nextstate0<=out_S2;
+		out_S2: nextstate0<=out_S2;
+		endcase
+		
+		end
+	else
+		begin
+		case(currstate0)
+		out_S0: nextstate0<=out_S0;
+		out_S1: nextstate0<=out_S2;
+		out_S2: nextstate0<=out_S0;
+		endcase
+		
+	end
+end
+
+always @(*)
+	begin
+		if (currstate0 == out_S1) out = 1'b1;
+		else out = 1'b0;
+	end
+		
+endmodule 

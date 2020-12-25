@@ -1,0 +1,193 @@
+module logic_design(input [4:0] SW, input CLOCK_50, output reg [0:6] HEX3, HEX1,HEX0);
+	
+	parameter Seg8 = 7'b000_0000;
+	parameter Seg6 = 7'b010_0000;
+	parameter Seg4 = 7'b100_1100;
+	parameter Seg2 = 7'b001_0010;
+	parameter Seg1 = 7'b100_1111;
+	parameter Seg0 = 7'b000_0001;
+	
+	wire newClk;
+	clock(CLOCK_50, newClk);//NEW CLOCK
+	
+	wire [2:0] state;
+	wire [2:0] nextState;
+	
+	calculateNextState (SW,state,nextState);	
+	Three_bit_D_FF(newClk, nextState, state);
+	
+	always @(*)
+	begin
+		case(state)
+			0:HEX3=Seg0;    1:HEX3=Seg0;	2:HEX3=Seg1;	3:HEX3=Seg1;
+			4:HEX3=Seg2;	5:HEX3=Seg2;	 default:HEX3 = 7'b1111111;
+		endcase
+		case(state)
+			0:HEX1=Seg0;    1:HEX1=Seg0;	2:HEX1=Seg0;	3:HEX1=Seg1;
+			4:HEX1=Seg1;	5:HEX1=Seg2;	 default:HEX1 = 7'b1111111;
+		endcase
+		case(state)
+			0:HEX0=Seg0;    1:HEX0=Seg4;	2:HEX0=Seg8;	3:HEX0=Seg2;
+			4:HEX0=Seg6;	5:HEX0=Seg0;	 default:HEX0 = 7'b1111111;
+		endcase
+	end
+endmodule
+
+module D_FF(clk, D, Q);
+	input clk;
+	input D;
+    output Q;
+	reg Q;  // define out_1 as a register type
+	
+	initial
+		Q=1'b0;
+
+	// always block: structured procedural statement
+	// @: sensitivity list, defining signal to implement the always block
+	// posedge: positive edge, negedge: negative edge
+	always @(posedge clk)  // triggered at the rising edge
+	begin
+	// All registers use non-blocking statement, such as <=.
+	Q <= D;
+	end
+endmodule
+
+module Three_bit_D_FF(clk, D, Q);
+	input clk;
+	input [2:0] D;
+    output [2:0] Q;
+
+	D_FF(clk, D[0], Q[0]);
+	D_FF(clk, D[1], Q[1]);
+	D_FF(clk, D[2], Q[2]);
+	
+endmodule
+
+module full_adder(sum, car, a, b, cin);
+output [2:0] sum;
+output car;
+input [2:0] a, b;
+input cin;
+wire [1:0] c;
+
+assign sum[0]=a[0] ^ b[0] ^ cin;
+assign c[0]=((a[0] ^ b[0]) & cin) | (a[0] & b[0]);
+
+assign sum[1]=a[1] ^ b[1] ^ c[0];
+assign c[1]=((a[1] ^ b[1]) & c[0]) | (a[1] & b[1]);
+
+assign sum[2]=a[2] ^ b[2] ^ c[1];
+assign car=((a[2] ^ b[2]) & c[1]) | (a[2] & b[2]);
+
+endmodule
+
+module Six_System_adder(sum, car, a, b, cin);
+
+output [2:0] sum;//final result output
+output car;//final carry output
+input [2:0] a, b;//input BCDs
+input cin;//input Carry
+
+wire carryfromfirst;//Carry from first Fulladder 
+
+wire [2:0] resultfromfirst;//Number of digits of 1
+reg [1:0] threeadder;//if result of add(a,b) is over 5, Six_System_adder adds 3,
+//sixadder=6, else then sixadder=0
+
+wire get42; //is 1 if result of add(a,b) is 6, 7
+
+wire trashCarry;//useless carry from last Adder
+//this carry is useless
+
+reg zero;
+//value 0
+
+always @(*)
+begin
+	//set sixadder
+	threeadder[0] <= car;
+	threeadder[1] <= car;
+	zero = 1'b0;
+end
+
+//set first full adder
+full_adder firstFulladder(resultfromfirst, carryfromfirst, a,b,cin);
+
+//Define Number of digits of 6
+and(get42, resultfromfirst[2],resultfromfirst[1]);
+or(car, carryfromfirst, get42);
+
+//set last full adder
+full_adder lastFulladder(sum, trashCarry, threeadder, resultfromfirst,zero);
+//The last adder adding doesn`t need carry
+
+endmodule
+
+module calculateNextState (inx,state,nextState);
+input [3:0] inx;
+input [2:0] state;
+output [2:0] nextState;
+
+wire [2:0] transition;
+wire car;
+wire operator;
+wire overhead;
+reg zero;
+
+wire [3:0] result;
+
+always @(*)
+	begin
+		zero=1'b0;
+	end
+
+transitionConvertor(inx, transition);
+overheadConvertor(inx, operator);
+
+Six_System_adder(result, car, state, transition, zero);
+
+assign overhead=car^operator;
+
+three_bit_MUX(result,state,overhead,nextState);
+
+endmodule
+
+module MUX (input Ione, input Itwo, input S, output Y);
+	wire Sinvertor;
+	wire oneCondition, twoCondition;
+	nor(Sinvertor, S);
+	and(oneCondition,Ione,Sinvertor );
+	and(twoCondition,Itwo,S );
+	or(Y, oneCondition,twoCondition);
+endmodule
+
+module three_bit_MUX(input [2:0] Ione, input [2:0] Itwo, input S, output [2:0] Y);
+MUX (Ione[0],Itwo[0],S, Y[0]);
+MUX (Ione[1],Itwo[1],S, Y[1]);
+MUX (Ione[2],Itwo[2],S, Y[2]);
+
+endmodule 
+
+module transitionConvertor(input [3:0] switchs, output [2:0] transition);
+ 
+assign transition[0] = (!switchs[3])&(!switchs[2])&(!switchs[1])&(switchs[0]);
+assign transition[1] = (!switchs[3])&(!switchs[2])&(switchs[1])&(!switchs[0]);
+assign transition[2] = (switchs[3]^switchs[2])&(!switchs[1])&(!switchs[0]);
+ 
+endmodule 
+
+module overheadConvertor(input [3:0] switchs, output overhead);
+ 
+assign overhead = switchs[3]|((!switchs[2])&(!switchs[1])&(!switchs[3]))|(switchs[1]&switchs[0])|(switchs[2]&switchs[0])|(switchs[2]&switchs[1]);
+ 
+endmodule 
+
+module clock(input clk, output newclk);
+	reg [25:0]cnt;
+	
+	always@(posedge clk)
+	begin
+		cnt <= cnt + 1'b1;
+	end
+	assign newclk = cnt[24];
+endmodule

@@ -1,0 +1,41 @@
+module pulGen(in, clk, rst, out);
+	output reg out;
+	input clk, in, rst;
+	reg currstate;
+	reg memo;
+	
+	parameter zero = 1'b0; parameter one = 1'b1;
+	
+	initial
+		currstate=zero;
+	initial
+		memo=zero;
+
+	always @(posedge clk)
+	begin
+		if(rst)
+			begin
+				currstate<=zero;
+				memo<=zero;
+			end
+		else
+			begin
+			if(memo)
+				begin
+					currstate<=one;
+					memo<=zero;
+				end
+			else
+				begin
+					currstate<=zero;
+				end
+			end
+	end
+	
+	
+	always @(*)
+	begin
+		out=currstate;
+	end
+endmodule 
+

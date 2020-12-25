@@ -1,0 +1,31 @@
+always@(*)
+	begin
+		case(curState)
+		S0: begin 
+			
+			case(outWire)
+			InputNothing: begin NextState = S0; end
+			InputAdd4: begin NextState = S4; end
+			InputAdd8: begin NextState = S8; end
+			InputAdd12: begin NextState = S12; end
+			InputSub8: begin NextState = S0; end
+			default : begin NextState = S0; end
+			endcase
+			
+		end
+			
+		S4: begin 
+			case(outWire)
+			InputNothing: begin NextState = S4; end
+			InputAdd4: begin NextState = S8; end
+			InputAdd8: begin NextState = S12; end
+			InputAdd12: begin NextState = S16; end
+			InputSub8: begin NextState = S4; end
+			default : begin NextState = S4; end
+			endcase
+		end
+			
+		default : NextState = S0;
+	
+	endcase
+	end

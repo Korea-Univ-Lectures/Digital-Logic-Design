@@ -1,0 +1,185 @@
+
+module logic_design(input [4:0] SW, input CLOCK_50, output reg [0:6] HEX3, HEX1, HEX0);
+
+	parameter Seg8 = 7'b000_0000;
+	parameter Seg6 = 7'b010_0000;
+	parameter Seg4 = 7'b100_1100;
+	parameter Seg2 = 7'b001_0010;
+	parameter Seg1 = 7'b100_1111;
+	parameter Seg0 = 7'b000_0001;
+	
+	parameter S0 = 3'b000;
+	parameter S4 = 3'b001;
+	parameter S8 = 3'b010;
+	parameter S12 = 3'b011;
+	parameter S16 = 3'b100;
+	parameter S20 = 3'b101;
+		
+	parameter InputNothing = 4'b0000;
+	parameter InputAdd4 = 4'b0001;
+	parameter InputAdd8 = 4'b0010;
+	parameter InputAdd12 = 4'b0100;
+	parameter InputSub8 = 4'b1000;	
+		
+	wire [3:0] delayWire;
+	wire [3:0] outWire;
+	reg [2:0] curState;
+	reg [2:0] nextState;
+	
+	pulGen(SW[0], CLOCK_50, SW[4], delayWire[0]);
+	pulGen(SW[1], CLOCK_50, SW[4], delayWire[1]);
+	pulGen(SW[2], CLOCK_50, SW[4], delayWire[2]);
+	pulGen(SW[3], CLOCK_50, SW[4], delayWire[3]);
+	
+	firstChecker(delayWire[0] ,outWire[0]);
+	firstChecker(delayWire[1] ,outWire[1]);
+	firstChecker(delayWire[2] ,outWire[2]);
+	firstChecker(delayWire[3] ,outWire[3]);
+	
+	always@(posedge SW[4], posedge CLOCK_50)
+	begin
+		if(SW[4])
+			curState <= S0;
+		else
+			curState <= nextState;
+	end
+
+	always @(*)
+	begin
+		case(outWire)
+		InputNothing: begin nextState=curState; end
+		InputAdd4: begin 
+			case (curState)
+			S0: begin nextState=S4; end
+			S4: begin nextState=S8; end
+			S8: begin nextState=S12; end
+			S12: begin nextState=S16; end
+			S16: begin nextState=S20; end
+			S20: begin nextState=S20; end
+			default: begin nextState=curState; end
+			endcase
+		end
+		InputAdd8: begin 
+			case (curState)
+			S0: begin nextState=S8; end
+			S4: begin nextState=S12; end
+			S8: begin nextState=S16; end
+			S12: begin nextState=S20; end
+			S16: begin nextState=S16; end
+			S20: begin nextState=S20; end
+			default: begin nextState=curState; end
+			endcase
+		end
+		InputAdd12: begin 
+			case (curState)
+			S0: begin nextState=S12; end
+			S4: begin nextState=S16; end
+			S8: begin nextState=S20; end
+			S12: begin nextState=S12; end
+			S16: begin nextState=S16; end
+			S20: begin nextState=S20; end
+			default: begin nextState=curState; end
+			endcase
+		end
+		InputSub8: begin 
+			case (curState)
+			S0: begin nextState=S0; end
+			S4: begin nextState=S4; end
+			S8: begin nextState=S0; end
+			S12: begin nextState=S4; end
+			S16: begin nextState=S8; end
+			S20: begin nextState=S12; end
+			default: begin nextState=curState; end
+			endcase
+		end
+		default : begin nextState=curState; end
+		endcase	
+	end
+	
+	always@(*)
+	begin
+		case(curState)
+		S0: begin HEX0 = Seg0; HEX1 = Seg0; HEX3 = Seg0; end
+		S4: begin HEX0 = Seg4; HEX1 = Seg0; HEX3 = Seg0; end
+		S8: begin HEX0 = Seg8; HEX1 = Seg0; HEX3 = Seg1; end
+		S12: begin HEX0 = Seg2; HEX1 = Seg1; HEX3 = Seg1; end
+		S16: begin HEX0 = Seg6; HEX1 = Seg1; HEX3 = Seg2; end
+		S20: begin HEX0 = Seg0; HEX1 = Seg2; HEX3 = Seg2; end
+		
+		default : begin HEX0 = 7'b111_1111; HEX1 = 7'b111_1111; HEX3 = 7'b111_1111;end
+	endcase
+	end
+	
+endmodule
+
+module pulGen(in, clk, rst, out);
+	output reg out;
+	input clk, in, rst;
+	reg [1:0] currstate0;
+	reg [1:0] nextstate0;
+	integer cnt;
+	integer ncnt;
+	parameter out_S0 = 2'b00; parameter out_S1 = 2'b01; parameter out_S2 = 2'b10;
+
+	always @(posedge clk)//State Change
+	begin
+	if(rst)
+		begin
+		currstate0<=out_S0;cnt<=0;
+		end
+	else
+		begin
+		currstate0 <= nextstate0; cnt <= ncnt; 
+		end
+	end
+	
+	always @(*)
+	begin
+	case(currstate0)
+		out_S0 : begin
+			if(in) begin nextstate0 = out_S1; ncnt = 0; end
+			else   begin nextstate0 = out_S0; ncnt = 0; end
+		end
+		out_S1 : begin 
+			if(in) begin
+				nextstate0 = out_S1;
+				ncnt = cnt + 1;
+			end
+			else begin
+				nextstate0 = out_S0; 
+				if(cnt >= 1000)
+					nextstate0 = out_S2;
+				end
+			end
+			out_S2 : begin nextstate0 = out_S0; ncnt = 0; end
+		default : nextstate0 = out_S0;
+	endcase
+end
+
+always @(*)
+	begin
+		if (currstate0 == out_S2) out = 1'b1;
+		else out = 1'b0;
+	end
+		
+endmodule 
+
+
+module firstChecker(in ,out);
+
+input in;
+output out;
+
+reg memory;
+
+always @(*)
+begin
+	initial
+	begin
+		#1 memory = 1'b1;
+		#2 memory = 1'b0;
+	end
+end
+assign out = in&memory;
+
+endmodule
